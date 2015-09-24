@@ -11,12 +11,19 @@ FRAME = [WIDTH, HEIGHT]
 ANGULAR_VEL = .05
 ACCELERATION = .5
 FRICTION_COEF = .05
-MISSILE_VEL = 1
+MISSILE_VEL = 10
 
 score = 0
 lives = 3
 time = 0
 started = False
+
+def game_init():
+    global my_ship, rock_group, missile_group
+    my_ship = Ship([WIDTH / 2, HEIGHT / 2], [0, 0], 0, ship_image, ship_info)
+    rock_group = set()
+    missile_group = set()
+    soundtrack.rewind()
 
 class ImageInfo:
     def __init__(self, center, size, radius = 0, lifespan = None, animated = False):
@@ -110,6 +117,7 @@ def group_group_collide(group1, group2):
             group1.discard(sprite)
             num_of_collision += 1
     return num_of_collision
+
 
 # Ship class
 class Ship:
@@ -217,7 +225,7 @@ class Sprite:
             return False
            
 def draw(canvas):
-    global time, started, lives, scores
+    global time, started, lives, score
     
     # animiate background
     time += 1
@@ -243,7 +251,7 @@ def draw(canvas):
     
     # update ship and sprites
     my_ship.update()
-    scores += group_group_collide(rock_group, missile_group)
+    score += group_group_collide(rock_group, missile_group)
     if group_collide(rock_group, my_ship):
         lives -= 1
 
@@ -253,7 +261,13 @@ def draw(canvas):
                           splash_info.get_size(), [WIDTH / 2, HEIGHT / 2], 
                           splash_info.get_size())
 
-
+    # restart if lives = 0
+    if lives == 0:
+        started = False
+        timer.stop()
+        game_init()
+        
+    
 def keydown(key):
     if key == simplegui.KEY_MAP['left']:
         my_ship.turn('left')
@@ -274,32 +288,35 @@ def keyup(key):
 
 # mouseclick handlers that reset UI and conditions whether splash image is drawn
 def click(pos):
-    global started
+    global started, score, lives, time
     center = [WIDTH / 2, HEIGHT / 2]
     size = splash_info.get_size()
     inwidth = (center[0] - size[0] / 2) < pos[0] < (center[0] + size[0] / 2)
     inheight = (center[1] - size[1] / 2) < pos[1] < (center[1] + size[1] / 2)
     if (not started) and inwidth and inheight:
         started = True
+        timer.start()
+        score = 0
+        lives = 3
+        time = 0
+        soundtrack.play()
         
 # timer handler that spawns a rock    
 def rock_spawner():
     global rock_group
+    difficulty = 1 + float(score) / 10
     if len(rock_group) <= 12:
         pos = [WIDTH / random.randint(1, 8), HEIGHT / random.randint(1, 6)]
-        init_vel = [.5 - random.random(), .5 - random.random()]
+        init_vel = [difficulty * (.5 - random.random()), difficulty * (.5 - random.random())]
         ang_vel = (.5 - random.random()) * .1    # generate (-.05, .05]
-        rock_group.add(Sprite(pos, init_vel, 0, ang_vel, asteroid_image, asteroid_info))
+        if dist(pos, my_ship.get_position()) > 5 * my_ship.get_radius():
+            rock_group.add(Sprite(pos, init_vel, 0, ang_vel, asteroid_image, asteroid_info))
        
 # initialize frame
 frame = simplegui.create_frame("Asteroids", WIDTH, HEIGHT)
 
 # initialize ship and rock, missile sprites
-my_ship = Ship([WIDTH / 2, HEIGHT / 2], [0, 0], 0, ship_image, ship_info)
-rock_group = set([])
-missile_group = set([])
-# a_rock = Sprite([WIDTH / 3, HEIGHT / 3], [1, 1], 0, 0, asteroid_image, asteroid_info)
-# a_missile = Sprite([2 * WIDTH / 3, 2 * HEIGHT / 3], [-1,1], 0, 0, missile_image, missile_info, missile_sound)
+game_init()
 
 # register handlers
 frame.set_draw_handler(draw)
@@ -310,5 +327,4 @@ frame.set_mouseclick_handler(click)
 timer = simplegui.create_timer(1000.0, rock_spawner)
 
 # get things rolling
-timer.start()
 frame.start()
